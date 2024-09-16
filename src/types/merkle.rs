@@ -3,27 +3,84 @@ use super::hash::{Hashable, H256};
 /// A Merkle tree.
 #[derive(Debug, Default)]
 pub struct MerkleTree {
+    nodes: Vec<H256>,
+    n: u32,
 }
 
 impl MerkleTree {
     pub fn new<T>(data: &[T]) -> Self where T: Hashable, {
-        unimplemented!()
+        // create an empty mutable H256 vector
+        let mut hashed_vec: Vec<256> = Vec::new();
+        // store hashed value into hashed_vec
+        let mut n = data.len();
+        for i in 0..n{
+            let hashed = hash(data[i]);
+            hashed_vec.push(hashed);
+        }
+        // merging adjacent trees
+        n >>= 1;
+        let mut base = 0;
+        while (n >= 0){
+            for i in 0..n{
+                let mut concat = Vec::new();
+                concat.extend_from_slice(hashed_vec[base+2*i]);
+                concat.extend_from_slice(hashed_vec[base+2*i+1]);
+                let hashed = hash(concat);
+                hashed_vec.push(hashed);
+                // update base
+                base += 2*n;
+                // updae n
+                n >>= 1;
+            }
+        }
+        MerkleTree{nodes: hashed_vec, n: data.len()}
     }
 
     pub fn root(&self) -> H256 {
-        unimplemented!()
+        *(self.nodes.last().unwrap())
     }
 
     /// Returns the Merkle Proof of data at index i
     pub fn proof(&self, index: usize) -> Vec<H256> {
-        unimplemented!()
+        let mut level_cnt = self.n;
+        let mut idx = index;
+        let mut proof = Vec::new();
+
+        while level_cnt > 1 {
+            let mut sibling_id;
+            if (idx % 2 == 0) sibling_id = idx+1;
+            else              sibling_id = idx-1;
+            
+            proof.push(self.nodes[sibling_id]);
+
+            idx /= 2;
+            level_cnt /= 2;
+        }
+
+        proof
     }
 }
 
 /// Verify that the datum hash with a vector of proofs will produce the Merkle root. Also need the
 /// index of datum and `leaf_size`, the total number of leaves.
 pub fn verify(root: &H256, datum: &H256, proof: &[H256], index: usize, leaf_size: usize) -> bool {
-    unimplemented!()
+    let mut hashed = hash(*datum);
+    let mut idx = index;
+    for sibling in proof{
+        if idx % 2 == 0 {
+            let mut combined = Vec::with_capacity(64);
+            combined.extend_from_slice(hashed);
+            combined.extend_from_slice(sibling);
+            hashed = hashed(combined);
+        } else {
+            let mut combined = Vec::with_capacity(64);
+            combined.extend_from_slice(sibling);
+            combined.extend_from_slice(hashed);
+            hashed = hashed(combined);
+        }
+        idx /= 2;
+    }
+    &hashed == root
 }
 // DO NOT CHANGE THIS COMMENT, IT IS FOR AUTOGRADER. BEFORE TEST
 
