@@ -4,33 +4,34 @@ use super::hash::{Hashable, H256};
 #[derive(Debug, Default)]
 pub struct MerkleTree {
     nodes: Vec<H256>,
-    n: u32,
+    n: usize,
 }
 
 impl MerkleTree {
     pub fn new<T>(data: &[T]) -> Self where T: Hashable, {
         // create an empty mutable H256 vector
-        let mut hashed_vec: Vec<256> = Vec::new();
+        let mut hashed_vec: Vec<H256> = Vec::new();
         // store hashed value into hashed_vec
         let mut n = data.len();
         for i in 0..n{
-            let hashed = hash(data[i]);
+            let hashed = data[i].hash();
             hashed_vec.push(hashed);
         }
         // merging adjacent trees
-        n >>= 1;
+        n /= 2;
         let mut base = 0;
-        while (n >= 0){
+        while n > 0 {
             for i in 0..n{
                 let mut concat = Vec::new();
-                concat.extend_from_slice(hashed_vec[base+2*i]);
-                concat.extend_from_slice(hashed_vec[base+2*i+1]);
-                let hashed = hash(concat);
+                concat.extend_from_slice(hashed_vec[base+2*i].as_ref());
+                concat.extend_from_slice(hashed_vec[base+2*i+1].as_ref());
+                // let hashed = concat.hash();
+                let hashed: H256 = ring::digest::digest(&ring::digest::SHA256, &concat).into();
                 hashed_vec.push(hashed);
                 // update base
                 base += 2*n;
-                // updae n
-                n >>= 1;
+                // update n
+                n /= 2;
             }
         }
         MerkleTree{nodes: hashed_vec, n: data.len()}
@@ -44,16 +45,21 @@ impl MerkleTree {
     pub fn proof(&self, index: usize) -> Vec<H256> {
         let mut level_cnt = self.n;
         let mut idx = index;
+        let mut base = 0;
         let mut proof = Vec::new();
 
         while level_cnt > 1 {
             let mut sibling_id;
-            if (idx % 2 == 0) sibling_id = idx+1;
-            else              sibling_id = idx-1;
+            if idx % 2 == 0{
+                sibling_id = idx+1;
+            } else {
+                sibling_id = idx-1;
+            }              
             
-            proof.push(self.nodes[sibling_id]);
-
-            idx /= 2;
+            proof.push(self.nodes[base+sibling_id]);
+            
+            base += level_cnt;
+            idx = idx/2;
             level_cnt /= 2;
         }
 
@@ -64,22 +70,27 @@ impl MerkleTree {
 /// Verify that the datum hash with a vector of proofs will produce the Merkle root. Also need the
 /// index of datum and `leaf_size`, the total number of leaves.
 pub fn verify(root: &H256, datum: &H256, proof: &[H256], index: usize, leaf_size: usize) -> bool {
-    let mut hashed = hash(*datum);
+    let mut hashed: H256 = datum.clone(); // the datum is already hashed
     let mut idx = index;
     for sibling in proof{
+        let mut concat = Vec::with_capacity(64);
         if idx % 2 == 0 {
-            let mut combined = Vec::with_capacity(64);
-            combined.extend_from_slice(hashed);
-            combined.extend_from_slice(sibling);
-            hashed = hashed(combined);
+            concat.extend_from_slice(hashed.as_ref());
+            concat.extend_from_slice(sibling.as_ref());
+            // println!("left: {}", &hashed);
+            // println!("right: {}", &sibling);
         } else {
-            let mut combined = Vec::with_capacity(64);
-            combined.extend_from_slice(sibling);
-            combined.extend_from_slice(hashed);
-            hashed = hashed(combined);
+            concat.extend_from_slice(sibling.as_ref());
+            concat.extend_from_slice(hashed.as_ref());
+            // println!("left: {}", &sibling);
+            // println!("right: {}", &hashed);
         }
+        hashed = ring::digest::digest(&ring::digest::SHA256, &concat).into();
+        // println!("hash: {}", &hashed);
         idx /= 2;
     }
+    println!("{}", &hashed);
+    println!("{}", root);
     &hashed == root
 }
 // DO NOT CHANGE THIS COMMENT, IT IS FOR AUTOGRADER. BEFORE TEST
