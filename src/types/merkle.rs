@@ -14,10 +14,6 @@ impl MerkleTree {
         // store hashed value into hashed_vec
         let mut n = data.len();
 
-        if n == 0 {
-            return MerkleTree { nodes: hashed_vec, n: 0 };
-        }
-
         for i in 0..n{
             let hashed = data[i].hash();
             hashed_vec.push(hashed);
