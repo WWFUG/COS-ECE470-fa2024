@@ -13,6 +13,11 @@ impl MerkleTree {
         let mut hashed_vec: Vec<H256> = Vec::new();
         // store hashed value into hashed_vec
         let mut n = data.len();
+
+        if n == 0 {
+            return MerkleTree { nodes: hashed_vec, n: 0 };
+        }
+
         for i in 0..n{
             let hashed = data[i].hash();
             hashed_vec.push(hashed);
@@ -38,8 +43,12 @@ impl MerkleTree {
     }
 
     pub fn root(&self) -> H256 {
+        if self.nodes.is_empty() {
+            return H256::default(); // or some other appropriate default value
+        }
         *(self.nodes.last().unwrap())
     }
+
 
     /// Returns the Merkle Proof of data at index i
     pub fn proof(&self, index: usize) -> Vec<H256> {
@@ -146,6 +155,7 @@ mod tests {
         let proof = merkle_tree.proof(0);
         assert!(verify(&merkle_tree.root(), &input_data[0].hash(), &proof, 0, input_data.len()));
     }
+
 }
 
 // DO NOT CHANGE THIS COMMENT, IT IS FOR AUTOGRADER. AFTER TEST
