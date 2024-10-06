@@ -14,7 +14,7 @@ impl MerkleTree {
         // store hashed value into hashed_vec
         let mut n = data.len();
         if n == 0{
-            hashed_vec.push(hex!("0000000000000000000000000000000000000000000000000000000000000000").into());
+            hashed_vec.push(H256::default());
             return MerkleTree{nodes: hashed_vec, n: 0};
         }
         for i in 0..n{
