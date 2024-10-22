@@ -86,6 +86,14 @@ impl Blockchain {
         hashes.reverse(); // Return in order from genesis to tip
         hashes
     }
+
+    pub fn exist(&self, hash: &H256) -> bool {
+        self.blocks.contains_key(hash)
+    }
+
+    pub fn get_block(&self, hash: &H256) -> Block {
+        return self.blocks.get(hash).unwrap().clone();
+    }  
 }
 
 // DO NOT CHANGE THIS COMMENT, IT IS FOR AUTOGRADER. BEFORE TEST
