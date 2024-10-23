@@ -109,13 +109,7 @@ impl Worker {
                         self.server.broadcast(Message::NewBlockHashes(new_blk_hashes));
                     }            
                 }
-                Message::NewTransactionHashes(hash_vec) => {
-                    unimplemented!();
-                }
-                Message::GetTransactions(hash_vec) => {
-                    unimplemented!();
-                }
-                Message::Transactions(signed_tx_vec) => {
+                _ => {
                     unimplemented!();
                 }
             }
