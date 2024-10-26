@@ -10,7 +10,7 @@ pub struct Header {
     pub parent: H256,
     pub nonce: u32,
     pub difficulty: H256,
-    pub timestamp: std::time::SystemTime,
+    pub timestamp: u128,
     pub merkle_root: H256,
 }
 

@@ -16,20 +16,21 @@ impl Blockchain {
     /// Create a new blockchain, only containing the genesis block
     pub fn new() -> Self {
         // Create the genesis block with fixed values
-        // println!("New Blockchain");
+        println!("New Blockchain");
         let genesis_block = Block {
             header: Header {
-                parent: H256::default(), // Genesis block has no parent
+                parent: H256::from([0x00; 32]), // Genesis block has no parent
                 nonce: 0,
                 difficulty: H256::from([0xff; 32]), // Example fixed difficulty
-                timestamp: std::time::SystemTime::now(),
-                merkle_root: H256::default(), // Placeholder for merkle root
+                timestamp: 0,
+                merkle_root: H256::from([0x00; 32]), // Placeholder for merkle root
             },
             content: Content(Vec::new()), // Use the public constructor
         };
 
-        // println!("Genesis Block");
+        println!("Genesis Block");
         let genesis_hash = genesis_block.hash();
+        println!("Genesis Block {}", genesis_hash);
         
         // Return a new instance of Blockchain with initialized fields
         Blockchain {

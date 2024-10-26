@@ -12,6 +12,8 @@ use std::sync::{Arc, Mutex};
 use crate::blockchain::Blockchain;
 use crate::types::hash::{H256, Hashable};
 use crate::types::merkle::MerkleTree;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 
 enum ControlSignal {
     Start(u64), // the number controls the lambda of interval between block generation
@@ -155,7 +157,7 @@ impl Context {
             // TODO for student: actual mining, create a block
             let difficulty = [255u8; 32].into();
             let nonce = rand::random::<u32>();
-            let timestamp = std::time::SystemTime::now();
+            let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
             let content = Content(Vec::new());
             let merkle_root = MerkleTree::new(&content.0.as_slice()).root();
             let header = Header {
