@@ -99,10 +99,10 @@ impl Worker {
                                         .collect();
                     drop(blockchain);
                     if !missing_hashes.is_empty() {
-                        debug!(" Getting missing block hashes from peer");
-                        for hash in &missing_hashes{
-                            debug!("Missing block hash: {}", hash);
-                        }
+                        // debug!(" Getting missing block hashes from peer");
+                        // for hash in &missing_hashes{
+                        //     debug!("Missing block hash: {}", hash);
+                        // }
                         peer.write(Message::GetBlocks(missing_hashes));
                     }
                 }
@@ -115,58 +115,59 @@ impl Worker {
                                         .collect();
                     drop(blockchain);
                     if !block_vec.is_empty(){
-                        debug!(" Sending requested blocks to peer");
-                        for blk in &block_vec{
-                            debug!("New block hash: {}", blk.hash());
-                        }
+                        // debug!(" Sending requested blocks to peer");
+                        // for blk in &block_vec{
+                        //     debug!("New block hash: {}", blk.hash());
+                        // }
                         peer.write(Message::Blocks(block_vec));
                     }
                 }
                 Message::Blocks(block_vec) => {
                     let mut blockchain = self.blockchain.lock().unwrap();
-                    // let mut new_blk_hashes = Vec::<H256>::new();
+                    let mut new_blk_hashes = Vec::<H256>::new();
                     
-                    // let mut block_queue: VecDeque<Block> = VecDeque::from(block_vec); // Convert vector to VecDeque
+                    let mut block_queue: VecDeque<Block> = VecDeque::from(block_vec); // Convert vector to VecDeque
 
-                    // while let Some(blk) = block_queue.pop_front() {
-                    //     // PoW validity check
-                    //     if blk.hash() > blk.get_difficulty() { // invalid block
-                    //         continue;
-                    //     }
-                    //     // Parent check for existence
-                    //     if !blockchain.exist(&blk.get_parent()) {
-                    //         //handling orphan block
-                    //         orphan_buffer.insert_child(&blk.clone());
-                    //         continue;
-                    //     }
-                    //     // Consistency of difficulty check
-                    //     let parent_difficulty = blockchain.get_block(&blk.get_parent()).get_difficulty();
-                    //     if parent_difficulty != blk.get_difficulty() {
-                    //         continue;
-                    //     }
+                    while let Some(blk) = block_queue.pop_front() {
+                        // PoW validity check
+                        if blk.hash() > blk.get_difficulty() { // invalid block
+                            continue;
+                        }
+                        // Parent check for existence
+                        if !blockchain.exist(&blk.get_parent()) {
+                            //handling orphan block
+                            orphan_buffer.insert_child(&blk.clone());
+                            continue;
+                        }
+                        // Consistency of difficulty check
+                        let parent_difficulty = blockchain.get_block(&blk.get_parent()).get_difficulty();
+                        if parent_difficulty != blk.get_difficulty() {
+                            continue;
+                        }
 
-                    //     // Insert the block into the blockchain
-                    //     let mut cur_blk = blk.clone();
-                    //     if !blockchain.exist(&blk.hash()) {
+                        // Insert the block into the blockchain
+                        let mut cur_blk = blk.clone();
+                        if !blockchain.exist(&blk.hash()) {
 
-                    //         blockchain.insert(&blk);
-                    //         new_blk_hashes.push(blk.hash());
+                            blockchain.insert(&blk);
+                            new_blk_hashes.push(blk.hash());
                             
-                    //         // Check if the block is a parent of any orphan block
-                    //         if let Some(orphan_blocks) = orphan_buffer.buffer.remove(&blk.hash()) {
-                    //             for orphan in orphan_blocks {
-                    //                 block_queue.push_back(orphan); // Extend with orphan blocks
-                    //             }
-                    //         }
-                    //     }
-                    // }
+                            // Check if the block is a parent of any orphan block
+                            if let Some(orphan_blocks) = orphan_buffer.buffer.remove(&blk.hash()) {
+                                for orphan in orphan_blocks {
+                                    block_queue.push_back(orphan); // Extend with orphan blocks
+                                }
+                            }
+                        }
+                    }
 
-                    // drop(blockchain);
+                    drop(blockchain);
 
-                    // if !orphan_buffer.buffer.is_empty() {
-                    //     print!(" Handling orphan blocks");
-                    //     peer.write(Message::GetBlocks(orphan_buffer.buffer.keys().cloned().collect()));
-                    // }
+                    if !orphan_buffer.buffer.is_empty() {
+                        // debug!(" Handling orphan blocks");
+                        peer.write(Message::GetBlocks(orphan_buffer.buffer.keys().cloned().collect()));
+                    }
+
 
                     // let new_blk_hashes: Vec<H256>  = block_vec
                     //         .into_iter()
@@ -179,23 +180,11 @@ impl Worker {
                     //             }
                     //         })
                     //         .collect();
-                    let new_blk_hashes: Vec<H256>  = block_vec
-                            .into_iter()
-                            .filter_map(|block| {
-                                if !blockchain.exist(&block.hash()) {
-                                    blockchain.insert(&block);  // Insert the block into the blockchain
-                                    Some(block.hash())          // Return the hash to be collected
-                                } else {
-                                    None                        // If block already exists, skip it
-                                }
-                            })
-                            .collect();
-                    drop(blockchain);
                     if !new_blk_hashes.is_empty() {
-                        debug!(" Broadcasting new block hashes");
-                        for hash in &new_blk_hashes{
-                            debug!("New block hash: {}", hash);
-                        }
+                        // debug!(" Broadcasting new block hashes");
+                        // for hash in &new_blk_hashes{
+                        //     debug!("New block hash: {}", hash);
+                        // }
                         self.server.broadcast(Message::NewBlockHashes(new_blk_hashes));
                     }            
                 }

@@ -3,6 +3,8 @@ use crate::types::hash::{H256, Hashable};
 use super::transaction::SignedTransaction;
 use super::merkle::MerkleTree;
 use ring::digest;
+use hex_literal::hex;
+
 
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -68,11 +70,14 @@ pub fn generate_random_block(parent: &H256) -> Block {
     let content = Content(Vec::new()); // Empty content
 
     let merkle_root = MerkleTree::new(&Vec::<H256>::new()).root(); // Empty Merkle tree
-    println!("After???");
+
+    let difficulty = hex!("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").into(); // set difficulty
+
+    // println!("After???");
     let header = Header {
         parent: *parent,
         nonce,
-        difficulty: H256::default(), 
+        difficulty: difficulty, 
         timestamp: std::time::SystemTime::now(), // Current system time
         merkle_root,
     };

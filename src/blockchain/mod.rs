@@ -5,6 +5,8 @@ use crate::types::hash::H256;
 use crate::types::merkle::MerkleTree; // Make sure to include the MerkleTree
 use crate::types::hash::Hashable; 
 use std::time::SystemTime;
+use hex_literal::hex;
+
 
 pub struct Blockchain {
     blocks: HashMap<H256, Block>, // Storing blocks by their hash
@@ -17,11 +19,12 @@ impl Blockchain {
     pub fn new() -> Self {
         // Create the genesis block with fixed values
         println!("New Blockchain");
+        let difficulty = hex!("000effffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").into(); // set difficulty
         let genesis_block = Block {
             header: Header {
                 parent: H256::from([0x00; 32]), // Genesis block has no parent
                 nonce: 0,
-                difficulty: H256::from([0xff; 32]), // Example fixed difficulty
+                difficulty: difficulty, // Example fixed difficulty
                 timestamp: 0,
                 merkle_root: H256::from([0x00; 32]), // Placeholder for merkle root
             },
