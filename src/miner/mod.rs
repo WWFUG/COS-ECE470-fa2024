@@ -96,10 +96,12 @@ impl Context {
 
     fn miner_loop(&mut self) {
         let mut parent = H256::default();
+        let mut parent_difficulty = H256::default();
         match self.blockchain.lock() {
             Ok(blockchain_guard) => {
                 // println!("Obtained!");
                 parent = blockchain_guard.tip();
+                parent_difficulty = blockchain_guard.get_block(&parent).get_difficulty();
             }
             Err(poisoned) => {
                 println!("The mutex is poisoned! Can't safely access the blockchain.");
@@ -155,7 +157,7 @@ impl Context {
             }
 
             // TODO for student: actual mining, create a block
-            let difficulty = [255u8; 32].into();
+            let difficulty = parent_difficulty;
             let nonce = rand::random::<u32>();
             let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
             let content = Content(Vec::new());

@@ -18,8 +18,8 @@ impl Blockchain {
     /// Create a new blockchain, only containing the genesis block
     pub fn new() -> Self {
         // Create the genesis block with fixed values
-        println!("New Blockchain");
-        let difficulty = hex!("000effffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").into(); // set difficulty
+        // println!("New Blockchain");
+        let difficulty = hex!("00001fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").into(); // set difficulty
         let genesis_block = Block {
             header: Header {
                 parent: H256::from([0x00; 32]), // Genesis block has no parent
@@ -31,9 +31,9 @@ impl Blockchain {
             content: Content(Vec::new()), // Use the public constructor
         };
 
-        println!("Genesis Block");
+        // println!("Genesis Block");
         let genesis_hash = genesis_block.hash();
-        println!("Genesis Block {}", genesis_hash);
+        println!("Genesis Block {}\ndifficulty {}", genesis_hash, difficulty);
         
         // Return a new instance of Blockchain with initialized fields
         Blockchain {
