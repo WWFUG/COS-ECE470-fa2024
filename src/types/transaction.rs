@@ -3,11 +3,12 @@ use ring::signature::{Ed25519KeyPair, Signature, UnparsedPublicKey, ED25519};
 use rand::Rng;
 use super::address::Address;
 
+// We use UTXO model for transactions
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Transaction {
-    sender: Address,
-    receiver: Address,
-    value: u32,
+    pub receiver: Address,
+    pub value: u32,
+    pub account_nonce: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]

@@ -91,6 +91,20 @@ impl Blockchain {
         hashes
     }
 
+    /// Get all transactions of the longest chain, ordered from genesis to the tip
+    pub fn all_tx_in_longest_chain(&self) -> Vec<Vec<H256>> {
+        let longest_chain = self.all_blocks_in_longest_chain();
+
+        let mut tx_vec = Vec::new();
+        for n in 0..longest_chain.len() {
+            let block = self.blocks.get(&longest_chain[n]).unwrap();
+            let txs = block.content.transactions.clone();
+            let txs: Vec<H256> = txs.into_iter().map(|tx| tx.hash()).collect();
+            tx_vec.push(txs);
+        }
+        return tx_vec;
+    }
+
     pub fn exist(&self, hash: &H256) -> bool {
         self.blocks.contains_key(hash)
     }
