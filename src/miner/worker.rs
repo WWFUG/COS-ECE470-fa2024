@@ -2,6 +2,7 @@ use crossbeam::channel::{unbounded, Receiver, Sender, TryRecvError};
 use log::{debug, info};
 use crate::network::message::Message::{NewBlockHashes, self};
 use crate::types::block::Block;
+use crate::types::mempool::Mempool;
 use crate::network::server::Handle as ServerHandle;
 use crate::blockchain::{Blockchain};
 use crate::types::hash::Hashable;

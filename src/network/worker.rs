@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use crate::types::hash::H256;
 use crate::types::hash::Hashable; 
 use crate::blockchain::Blockchain;
+use crate::types::mempool::Mempool;
 use crate::types::block::{Block};
 
 use std::collections::VecDeque;
@@ -24,6 +25,7 @@ pub struct Worker {
     num_worker: usize,
     server: ServerHandle,
     blockchain: Arc<Mutex<Blockchain>>, 
+    mempool: Arc<Mutex<Mempool>>,
 }
 
 #[derive(Clone)]
@@ -52,12 +54,14 @@ impl Worker {
         msg_src: smol::channel::Receiver<(Vec<u8>, peer::Handle)>,
         server: &ServerHandle,
         blockchain: &Arc<Mutex<Blockchain>>,
+        mempool: &Arc<Mutex<Mempool>>,
     ) -> Self {
         Self {
             msg_chan: msg_src,
             num_worker,
             server: server.clone(),
             blockchain: Arc::clone(blockchain),
+            mempool: Arc::clone(mempool),
         }
     }
 
@@ -171,7 +175,13 @@ impl Worker {
                         self.server.broadcast(Message::NewBlockHashes(new_blk_hashes));
                     }            
                 }
-                _ => {
+                Message::NewTransactionHashes(hash_vec) => {
+                    unimplemented!();
+                }
+                Message::GetTransactions(hash_vec) => {
+                    unimplemented!();
+                }
+                Message::Transactions(tx_vec) => {
                     unimplemented!();
                 }
             }
