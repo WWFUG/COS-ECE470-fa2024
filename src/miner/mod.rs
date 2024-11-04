@@ -163,13 +163,26 @@ impl Context {
                 return;
             }
 
-            // TODO handling trasaction using mempool
+            // TODO handling transaction using mempool
             // insert the transactions into content
+
+
+            let mempool = self.mempool.lock().unwrap();
+            let mut block_txs = Vec::new();
+            let tx_limit = 16; // NOTE: this is a temporary value, you can change it
+
+            for tx in mempool.get_transactions() {
+                block_txs.push(tx.clone());
+                if block_txs.len() == tx_limit {
+                    break;
+                }
+            }
+
 
             let difficulty = parent_difficulty;
             let nonce = rand::random::<u32>();
             let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
-            let content = Content(Vec::new());
+            let content = Content(block_txs);
             let merkle_root = MerkleTree::new(&content.0.as_slice()).root();
             let header = Header {
                 parent,
@@ -187,6 +200,9 @@ impl Context {
                 parent = block.hash();
 
                 // TODO remove transactions in this block from mempool 
+                for tx in block.content.transactions.iter() {
+                    mempool.remove(&tx);
+                }
 
                 match self.blockchain.lock() {
                     Ok(mut blockchain_guard) => {
@@ -198,6 +214,8 @@ impl Context {
                 }
                 self.finished_block_chan.send(block.clone()).expect("Send finished block error");
             }
+
+            drop(mempool);
 
             if let OperatingState::Run(i) = self.operating_state {
                 if i != 0 {

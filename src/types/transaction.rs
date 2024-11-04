@@ -13,9 +13,9 @@ pub struct Transaction {
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct SignedTransaction {
-    transaction: Transaction,
-    signature: Vec<u8>,
-    public_key: Vec<u8>,
+    pub transaction: Transaction,
+    pub signature: Vec<u8>,
+    pub public_key: Vec<u8>,
 }
 
 /// Create digital signature of a transaction

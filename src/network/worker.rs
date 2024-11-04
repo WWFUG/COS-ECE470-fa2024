@@ -7,6 +7,7 @@ use crate::types::hash::Hashable;
 use crate::blockchain::Blockchain;
 use crate::types::mempool::Mempool;
 use crate::types::block::{Block};
+use crate::types::transaction::{SignedTransaction, Transaction, verify};
 
 use std::collections::VecDeque;
 use std::collections::HashMap;
@@ -176,13 +177,57 @@ impl Worker {
                     }            
                 }
                 Message::NewTransactionHashes(hash_vec) => {
-                    unimplemented!();
+                    debug!("Receive New Tx Hashes");
+                    let mempool = self.mempool.lock().unwrap();
+                    let missing_hashes: Vec<H256> = hash_vec
+                                        .into_iter()
+                                        .filter(|hash| !mempool.exist(hash))
+                                        .collect();
+                    drop(mempool);
+                    if !missing_hashes.is_empty() {
+                        debug!("Reqeest Missing Txs");
+                        peer.write(Message::GetTransactions(missing_hashes));
+                    }
                 }
                 Message::GetTransactions(hash_vec) => {
-                    unimplemented!();
+                    debug!("Receive Get Txs");
+                    let mempool = self.mempool.lock().unwrap();       
+                    let tx_vec: Vec<Block> = hash_vec
+                                        .into_iter()
+                                        .filter(|hash| mempool.exist(&hash))
+                                        .map(|hash| mempool.get_tx(&hash))
+                                        .collect();
+                    drop(mempool);
+                    if !tx_vec.is_empty(){
+                        debug!("Send Txs");
+                        peer.write(Message::Transactions(tx_vec));
+                    }
                 }
                 Message::Transactions(tx_vec) => {
-                    unimplemented!();
+                    debug!("Receive Txs");
+                    let mut mempool = self.mempool.lock().unwrap();
+                    let mut new_tx_hashes = Vec::<H256>::new();
+                    for signed_tx in tx_vec{
+                        // Check transaction validity
+                        if !transaction::verify(&signed_tx, &signed_tx.public_key, &signed_tx.signature) {
+                            debug!("Invalid Tx");
+                            continue;
+                        }
+
+                        // Check if the transaction is already in the mempool
+                        if !mempool.exist(&signed_tx.hash()) {
+                            mempool.insert(&signed_tx);
+                            new_tx_hashes.push(signed_tx.hash());
+                            debug!("Tx {} inserted", signed_tx.hash());
+                        }
+                    }
+
+                    drop(mempool);
+
+                    if !new_tx_hashes.is_empty() {
+                        debug!("Broadcasting new tx hashes");
+                        self.server.broadcast(Message::NewTransactionHashes(new_tx_hashes));
+                    }
                 }
             }
         }
