@@ -11,6 +11,7 @@ pub mod generator;
 
 use blockchain::Blockchain;
 use types::mempool::Mempool;
+use generator::Generator;
 use clap::clap_app;
 use smol::channel;
 use log::{error, info};
@@ -93,6 +94,8 @@ fn main() {
     miner_ctx.start();
     miner_worker_ctx.start();
 
+    let tx_generator = Generator::new(&server, &mempool);
+
     // connect to known peers
     if let Some(known_peers) = matches.values_of("known_peer") {
         let known_peers: Vec<String> = known_peers.map(|x| x.to_owned()).collect();
@@ -133,6 +136,7 @@ fn main() {
         &miner,
         &server,
         &blockchain,
+        &tx_generator,
     );
 
     loop {
