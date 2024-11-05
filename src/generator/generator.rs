@@ -12,7 +12,8 @@ use crate::network::server::Handle as ServerHandle;
 use std::sync::{Arc, Mutex};
 use crate::types::address::Address;
 use crate::types::transaction::{SignedTransaction, sign, Transaction};
-use crate::types::key_pair::random;
+use crate::types::key_pair;
+use crate::network::message::Message;
 
 #[derive(Clone)]
 pub struct TransactionGenerator {
@@ -25,7 +26,10 @@ impl TransactionGenerator {
         server: &ServerHandle,
         mempool: &Arc<Mutex<Mempool>>,
     ) -> Self {
-        Self {server.clone(), Arc::clone(mempool)}
+        Self { 
+            server: server.clone(), 
+            mempool: Arc::clone(mempool),
+        }
     }
 
     pub fn start(self, theta: u64) {
@@ -50,10 +54,10 @@ impl TransactionGenerator {
                 receiver,
                 value,
                 account_nonce,
-            }
+            };
 
             let key = key_pair::random();
-            let signature = transaction::sign(&_new_tx, &key);
+            let signature = sign(&_new_tx, &key);
             let _signed_tx = SignedTransaction{
                 transaction: _new_tx,
                 signature: signature.as_ref().to_vec(),
@@ -64,10 +68,13 @@ impl TransactionGenerator {
             let mut mempool = self.mempool.lock().unwrap();
             mempool.insert(&_signed_tx);
             drop(mempool);
+
+            println!("New transaction generated: {:?}", _signed_tx.hash());
+
             self.server.broadcast(Message::NewTransactionHashes(vec![_signed_tx.hash()])); 
 
             if theta != 0 {
-                let interval = time::Duration::from_millis(10 * theta);
+                let interval = time::Duration::from_micros( theta );
                 thread::sleep(interval);
             }
         }

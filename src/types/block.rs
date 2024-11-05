@@ -23,12 +23,14 @@ pub struct Block {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Content(pub Vec<SignedTransaction>);
+pub struct Content{
+    pub transactions: Vec<SignedTransaction>,
+}
 
 
 impl Content {
     pub fn new(transactions: Vec<SignedTransaction>) -> Self {
-        Content(transactions)
+        Content{ transactions }
     }
 }
 

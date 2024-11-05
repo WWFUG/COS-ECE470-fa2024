@@ -3,6 +3,8 @@ use super::{
     transaction::SignedTransaction,
 };
 
+use std::collections::HashMap;
+
 #[derive(Debug, Default, Clone)]
 pub struct Mempool {
     pub transactions: HashMap<H256, SignedTransaction>,
@@ -17,7 +19,7 @@ impl Mempool {
     pub fn all_transactions(&self) -> Vec<SignedTransaction> {
         let mut ret_vec = Vec::new();
         for (_, transaction) in self.transactions.iter() {
-            transactions.push(transaction.clone());
+            ret_vec.push(transaction.clone());
         }
         ret_vec
     }

@@ -1,6 +1,6 @@
 use serde::Serialize;
 use crate::blockchain::Blockchain;
-use crate::generator::TransactionGenerator
+use crate::generator::generator::TransactionGenerator;
 use crate::miner::Handle as MinerHandle;
 use crate::network::server::Handle as NetworkServerHandle;
 use crate::network::message::Message;
@@ -70,6 +70,7 @@ impl Server {
                 let miner = server.miner.clone();
                 let network = server.network.clone();
                 let blockchain = Arc::clone(&server.blockchain);
+                let tx_generator = server.tx_generator.clone();
                 thread::spawn(move || {
                     // a valid url requires a base
                     let base_url = Url::parse(&format!("http://{}/", &addr)).unwrap();
@@ -136,18 +137,20 @@ impl Server {
                         "/blockchain/longest-chain" => {
                             let blockchain = blockchain.lock().unwrap();
                             let v = blockchain.all_blocks_in_longest_chain();
+                            drop(blockchain);
                             let v_string: Vec<String> = v.into_iter().map(|h|h.to_string()).collect();
                             respond_json!(req, v_string);
                         }
                         "/blockchain/longest-chain-tx" => {
                             // unimplemented!()
-                            let txs = blockchain.lock().unwrap().all_transactions_in_longest_chain();
+                            let txs = blockchain.lock().unwrap().all_tx_in_longest_chain();
+                            drop(blockchain);
                             let mut vv_string = Vec::new();
                             for tx in txs {
-                                let v_string = tx.iter().map(|h|h.to_string()).collect();
+                                let v_string : Vec<String> = tx.iter().map(|h|h.to_string()).collect();
                                 vv_string.push(v_string);
                             }
-                            respond_result!(req, false, "unimplemented!");
+                            respond_json!(req, vv_string);
                         }
                         "/blockchain/longest-chain-tx-count" => {
                             // unimplemented!()

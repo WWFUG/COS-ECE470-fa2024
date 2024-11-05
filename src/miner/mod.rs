@@ -167,11 +167,13 @@ impl Context {
             // insert the transactions into content
 
 
-            let mempool = self.mempool.lock().unwrap();
+            let mut mempool = self.mempool.lock().unwrap();
             let mut block_txs = Vec::new();
-            let tx_limit = 16; // NOTE: this is a temporary value, you can change it
+            let tx_limit = 30; // NOTE: this is a temporary value, you can change it
+            // FIXME Not Sure if doing this is finde
+            let min_tx = 10; // NOTE: this is a temporary value, you can change it
 
-            for tx in mempool.get_transactions() {
+            for tx in mempool.all_transactions() {
                 block_txs.push(tx.clone());
                 if block_txs.len() == tx_limit {
                     break;
@@ -182,8 +184,8 @@ impl Context {
             let difficulty = parent_difficulty;
             let nonce = rand::random::<u32>();
             let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
-            let content = Content(block_txs);
-            let merkle_root = MerkleTree::new(&content.0.as_slice()).root();
+            let content = Content{ transactions: block_txs };
+            let merkle_root = MerkleTree::new(&content.transactions.as_slice()).root();
             let header = Header {
                 parent,
                 nonce,
@@ -195,14 +197,18 @@ impl Context {
             
             let block = Block {header, content};
 
-            if block.hash() <= difficulty {
+            if block.hash() <= difficulty && !block.content.transactions.is_empty() 
+            && block.content.transactions.len() >= min_tx {
                 // println!("parent: {}", parent);
                 parent = block.hash();
+
+                println!("Block tx size: {}", block.content.transactions.len());
 
                 // TODO remove transactions in this block from mempool 
                 for tx in block.content.transactions.iter() {
                     mempool.remove(&tx);
                 }
+                drop(mempool);
 
                 match self.blockchain.lock() {
                     Ok(mut blockchain_guard) => {
@@ -214,8 +220,6 @@ impl Context {
                 }
                 self.finished_block_chan.send(block.clone()).expect("Send finished block error");
             }
-
-            drop(mempool);
 
             if let OperatingState::Run(i) = self.operating_state {
                 if i != 0 {

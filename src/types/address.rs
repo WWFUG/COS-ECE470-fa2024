@@ -1,9 +1,21 @@
 use serde::{Serialize, Deserialize};
+use rand::Rng;
 use ring::digest;
 
 // 20-byte address
 #[derive(Eq, PartialEq, Serialize, Deserialize, Clone, Hash, Default, Copy)]
 pub struct Address([u8; 20]);
+
+
+impl Address {
+    // Generate a random 20-byte address
+    pub fn random() -> Self {
+        let mut rng = rand::thread_rng();
+        let mut addr = [0u8; 20];
+        rng.fill(&mut addr);
+        Address(addr)
+    }
+}
 
 impl std::convert::From<&[u8; 20]> for Address {
     fn from(input: &[u8; 20]) -> Address {

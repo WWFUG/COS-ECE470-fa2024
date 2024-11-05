@@ -8,6 +8,7 @@ use crate::blockchain::Blockchain;
 use crate::types::mempool::Mempool;
 use crate::types::block::{Block};
 use crate::types::transaction::{SignedTransaction, Transaction, verify};
+use crate::types::key_pair;
 
 use std::collections::VecDeque;
 use std::collections::HashMap;
@@ -126,6 +127,7 @@ impl Worker {
                 Message::Blocks(block_vec) => {
                     debug!("Receive Blocks");
                     let mut blockchain = self.blockchain.lock().unwrap();
+                    let mut mempool = self.mempool.lock().unwrap();
                     let mut new_blk_hashes = Vec::<H256>::new();
                     
                     let mut block_queue: VecDeque<Block> = VecDeque::from(block_vec); // Convert vector to VecDeque
@@ -135,6 +137,19 @@ impl Worker {
                         // PoW validity check
                         debug!("Processing Block hash: {}", blk.hash());
                         if blk.hash() > blk.get_difficulty() { // invalid block
+                            continue;
+                        }
+
+                        // Transaction validity check
+                        let mut tx_valid = true;
+                        for tx in blk.content.transactions.iter() {
+                            if !verify(&tx.transaction, &tx.public_key, &tx.signature) {
+                                tx_valid = false;
+                                break;
+                            }
+                        }
+                        if !tx_valid {
+                            // println!("Invalid Tx!!!");
                             continue;
                         }
 
@@ -157,6 +172,13 @@ impl Worker {
                         if !blockchain.exist(&blk.hash()) {
 
                             blockchain.insert(&blk);
+
+                            // remove transactions in this block from mempool
+                            // update mempool
+                            for tx in &blk.content.transactions {
+                                mempool.remove(&tx);
+                            }
+
                             new_blk_hashes.push(blk.hash());
                             debug!("Block {} inserted", blk.hash());
                             
@@ -170,6 +192,7 @@ impl Worker {
                     }
 
                     drop(blockchain);
+                    drop(mempool);
 
                     if !new_blk_hashes.is_empty() {
                         debug!("Broadcasting new block hashes");
@@ -192,7 +215,7 @@ impl Worker {
                 Message::GetTransactions(hash_vec) => {
                     debug!("Receive Get Txs");
                     let mempool = self.mempool.lock().unwrap();       
-                    let tx_vec: Vec<Block> = hash_vec
+                    let tx_vec: Vec<SignedTransaction> = hash_vec
                                         .into_iter()
                                         .filter(|hash| mempool.exist(&hash))
                                         .map(|hash| mempool.get_tx(&hash))
@@ -209,8 +232,10 @@ impl Worker {
                     let mut new_tx_hashes = Vec::<H256>::new();
                     for signed_tx in tx_vec{
                         // Check transaction validity
-                        if !transaction::verify(&signed_tx, &signed_tx.public_key, &signed_tx.signature) {
+                        if !verify(&signed_tx.transaction, &signed_tx.public_key, 
+                                   &signed_tx.signature) {
                             debug!("Invalid Tx");
+                            // println!("Invalid Tx!!!");
                             continue;
                         }
 
