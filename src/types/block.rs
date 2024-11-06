@@ -64,6 +64,10 @@ impl Block {
     pub fn get_difficulty(&self) -> H256 {
         self.header.difficulty
     }
+
+    pub fn get_transactions(&self) -> Vec<SignedTransaction> {
+        self.content.transactions.clone()
+    }
 }
 
 #[cfg(any(test, test_utilities))]

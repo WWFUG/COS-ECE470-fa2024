@@ -46,12 +46,13 @@ impl Worker {
                 .recv()
                 .expect("Receive finished block error");
 
-            let mut blockchain = self.blockchain.lock().unwrap();
-            blockchain.insert(&_block);
-            drop(blockchain);
-            debug!("Block {} succesfully mined; Broadcasting ...", _block.hash());
-            self.server
-                .broadcast(Message::NewBlockHashes(vec![_block.hash()])); // blocking operation
+            {
+                let mut blockchain = self.blockchain.lock().unwrap();
+                blockchain.insert(&_block);
+                debug!("Block {} succesfully mined; Broadcasting ...", _block.hash());
+                self.server
+                    .broadcast(Message::NewBlockHashes(vec![_block.hash()])); // blocking operation
+            }
         }
     }
 

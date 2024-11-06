@@ -102,18 +102,9 @@ impl Context {
     }
 
     fn miner_loop(&mut self) {
-        let mut parent = H256::default();
+        // FIXME: put this into the loop
+        let mut parent_hash = H256::default();
         let mut parent_difficulty = H256::default();
-        match self.blockchain.lock() {
-            Ok(blockchain_guard) => {
-                // println!("Obtained!");
-                parent = blockchain_guard.tip();
-                parent_difficulty = blockchain_guard.get_block(&parent).get_difficulty();
-            }
-            Err(poisoned) => {
-                println!("The mutex is poisoned! Can't safely access the blockchain.");
-            }
-        }
 
         // main mining loop
         loop {
@@ -166,58 +157,58 @@ impl Context {
             // TODO handling transaction using mempool
             // insert the transactions into content
 
+            let tx_limit = 50; // NOTE: this is a temporary value, you can change it
 
-            let mut mempool = self.mempool.lock().unwrap();
             let mut block_txs = Vec::new();
-            let tx_limit = 30; // NOTE: this is a temporary value, you can change it
-            // FIXME Not Sure if doing this is finde
-            let min_tx = 10; // NOTE: this is a temporary value, you can change it
-
-            for tx in mempool.all_transactions() {
-                block_txs.push(tx.clone());
-                if block_txs.len() == tx_limit {
-                    break;
+            {
+                let mempool = self.mempool.lock().unwrap();
+                for tx in mempool.all_transactions() {
+                    block_txs.push(tx.clone());
+                    if block_txs.len() == tx_limit {
+                        break;
+                    }
                 }
             }
 
-
+            {
+                let blockchain = self.blockchain.lock().unwrap();
+                parent_hash = blockchain.tip();
+                parent_difficulty = blockchain.get_block(&parent_hash).get_difficulty();
+            }
+            
             let difficulty = parent_difficulty;
             let nonce = rand::random::<u32>();
             let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
             let content = Content{ transactions: block_txs };
             let merkle_root = MerkleTree::new(&content.transactions.as_slice()).root();
             let header = Header {
-                parent,
-                nonce,
-                difficulty,
-                timestamp,
-                merkle_root,
+                parent: parent_hash,
+                nonce: nonce,
+                difficulty: difficulty,
+                timestamp: timestamp,
+                merkle_root: merkle_root,
             };
 
             
             let block = Block {header, content};
 
-            if block.hash() <= difficulty && !block.content.transactions.is_empty() 
-            && block.content.transactions.len() >= min_tx {
-                // println!("parent: {}", parent);
-                parent = block.hash();
+            if block.hash() <= difficulty && !block.get_transactions().is_empty() {
 
                 println!("Block tx size: {}", block.content.transactions.len());
 
                 // TODO remove transactions in this block from mempool 
-                for tx in block.content.transactions.iter() {
-                    mempool.remove(&tx);
+                {
+                    let mut mempool = self.mempool.lock().unwrap();
+                    for tx in block.content.transactions.iter() {
+                        mempool.remove(&tx);
+                    }
                 }
-                drop(mempool);
 
-                match self.blockchain.lock() {
-                    Ok(mut blockchain_guard) => {
-                        blockchain_guard.insert(&block);
-                    }
-                    Err(poisoned) => {
-                        println!("The mutex is poisoned!");
-                    }
+                {
+                    let mut blockchain = self.blockchain.lock().unwrap();
+                    blockchain.insert(&block);
                 }
+                
                 self.finished_block_chan.send(block.clone()).expect("Send finished block error");
             }
 

@@ -41,10 +41,11 @@ impl OrphanBuffer {
     }
 
     pub fn insert_child(&mut self, block: &Block) {
-        if self.buffer.contains_key(&block.get_parent()) {
-            self.buffer.get_mut(&block.get_parent()).unwrap().push(block.clone());
+        let parent = block.get_parent();
+        if self.buffer.contains_key(&parent) {
+            self.buffer.get_mut(&parent).unwrap().push(block.clone());
         } else {
-            self.buffer.insert(block.get_parent(), vec![block.clone()]);
+            self.buffer.insert(parent, vec![block.clone()]);
         }
     }
 }
@@ -99,26 +100,30 @@ impl Worker {
                 }
                 Message::NewBlockHashes(hash_vec) => {
                     debug!("Receive New Block Hashes");
-                    let blockchain = self.blockchain.lock().unwrap();
-                    let missing_hashes: Vec<H256> = hash_vec
+                    let mut missing_hashes: Vec<H256> = Vec::new();
+                    {
+                        let blockchain = self.blockchain.lock().unwrap();
+                        missing_hashes = hash_vec
                                         .into_iter()
                                         .filter(|hash| !blockchain.exist(hash))
                                         .collect();
-                    drop(blockchain);
+                    }   
                     if !missing_hashes.is_empty() {
-                        debug!("Reqeest Missing Blocks");
+                        debug!("Request Missing Blocks");
                         peer.write(Message::GetBlocks(missing_hashes));
                     }
                 }
                 Message::GetBlocks(hash_vec) => {
                     debug!("Receive Get Blocks");
-                    let blockchain = self.blockchain.lock().unwrap();       
-                    let block_vec: Vec<Block> = hash_vec
-                                        .into_iter()
-                                        .filter(|hash| blockchain.exist(&hash))
-                                        .map(|hash| blockchain.get_block(&hash))
-                                        .collect();
-                    drop(blockchain);
+                    let mut block_vec: Vec<Block> = Vec::new(); 
+                    {  
+                        let blockchain = self.blockchain.lock().unwrap();
+                        block_vec  = hash_vec
+                                    .into_iter()
+                                    .filter(|hash| blockchain.exist(&hash))
+                                    .map(|hash| blockchain.get_block(&hash))
+                                    .collect();
+                    }
                     if !block_vec.is_empty(){
                         debug!("Send Blocks");
                         peer.write(Message::Blocks(block_vec));
@@ -126,73 +131,73 @@ impl Worker {
                 }
                 Message::Blocks(block_vec) => {
                     debug!("Receive Blocks");
-                    let mut blockchain = self.blockchain.lock().unwrap();
-                    let mut mempool = self.mempool.lock().unwrap();
                     let mut new_blk_hashes = Vec::<H256>::new();
-                    
                     let mut block_queue: VecDeque<Block> = VecDeque::from(block_vec); // Convert vector to VecDeque
 
-                    while let Some(blk) = block_queue.pop_front() {
-                        
-                        // PoW validity check
-                        debug!("Processing Block hash: {}", blk.hash());
-                        if blk.hash() > blk.get_difficulty() { // invalid block
-                            continue;
-                        }
-
-                        // Transaction validity check
-                        let mut tx_valid = true;
-                        for tx in blk.content.transactions.iter() {
-                            if !verify(&tx.transaction, &tx.public_key, &tx.signature) {
-                                tx_valid = false;
-                                break;
-                            }
-                        }
-                        if !tx_valid {
-                            // println!("Invalid Tx!!!");
-                            continue;
-                        }
-
-                        // Parent check for existence
-                        if !blockchain.exist(&blk.get_parent()) {
-                            //handling orphan block
-                            orphan_buffer.insert_child(&blk.clone());
-
-                            peer.write(Message::GetBlocks(vec![blk.get_parent()]));
-                            continue;
-                        }
-
-                        // Consistency of difficulty check
-                        let parent_difficulty = blockchain.get_block(&blk.get_parent()).get_difficulty();
-                        if parent_difficulty != blk.get_difficulty() {
-                            continue;
-                        }
-
-                        // Insert the block into the blockchain
-                        if !blockchain.exist(&blk.hash()) {
-
-                            blockchain.insert(&blk);
-
-                            // remove transactions in this block from mempool
-                            // update mempool
-                            for tx in &blk.content.transactions {
-                                mempool.remove(&tx);
-                            }
-
-                            new_blk_hashes.push(blk.hash());
-                            debug!("Block {} inserted", blk.hash());
+                    {
+                        let mut blockchain = self.blockchain.lock().unwrap();
+                        // Process the blocks in the queue
+                        while let Some(blk) = block_queue.pop_front() {
                             
-                            // Check if the block is a parent of any orphan block
-                            if let Some(orphan_blocks) = orphan_buffer.buffer.remove(&blk.hash()) {
-                                for orphan in orphan_blocks {
-                                    block_queue.push_back(orphan); // Extend with orphan blocks
+                            // PoW validity check
+                            debug!("Processing Block hash: {}", blk.hash());
+                            if blk.hash() > blk.get_difficulty() { // invalid block
+                                continue;
+                            }
+
+                            // Parent check for existence
+                            if !blockchain.exist(&blk.get_parent()) {
+                                //handling orphan block
+                                orphan_buffer.insert_child(&blk.clone());
+
+                                peer.write(Message::GetBlocks(vec![blk.get_parent()]));
+                                continue;
+                            }
+
+                            // Consistency of difficulty check
+                            let parent_difficulty = blockchain.get_block(&blk.get_parent()).get_difficulty();
+                            if parent_difficulty != blk.get_difficulty() {
+                                continue;
+                            }
+
+                            // Transaction validity check
+                            // let mut tx_valid = true;
+                            // for tx in blk.content.transactions.iter() {
+                            //     if !verify(&tx.transaction, &tx.public_key, &tx.signature) {
+                            //         tx_valid = false;
+                            //         break;
+                            //     }
+                            // }
+                            // if !tx_valid {
+                            //     continue;
+                            // }
+
+                            // Insert the block into the blockchain
+                            if !blockchain.exist(&blk.hash()) {
+
+                                blockchain.insert(&blk);
+
+                                // remove transactions in this block from mempool
+                                // update mempool
+                                {
+                                    let mut mempool = self.mempool.lock().unwrap();
+                                    for tx in &blk.content.transactions {
+                                        mempool.remove(&tx);
+                                    }
+                                }
+
+                                new_blk_hashes.push(blk.hash());
+                                debug!("Block {} inserted", blk.hash());
+                                
+                                // Check if the block is a parent of any orphan block
+                                if let Some(orphan_blocks) = orphan_buffer.buffer.remove(&blk.hash()) {
+                                    for orphan in orphan_blocks {
+                                        block_queue.push_back(orphan); // Extend with orphan blocks
+                                    }
                                 }
                             }
                         }
                     }
-
-                    drop(blockchain);
-                    drop(mempool);
 
                     if !new_blk_hashes.is_empty() {
                         debug!("Broadcasting new block hashes");
@@ -201,12 +206,14 @@ impl Worker {
                 }
                 Message::NewTransactionHashes(hash_vec) => {
                     debug!("Receive New Tx Hashes");
-                    let mempool = self.mempool.lock().unwrap();
-                    let missing_hashes: Vec<H256> = hash_vec
+                    let mut missing_hashes: Vec<H256> = Vec::new();
+                    {
+                        let mempool = self.mempool.lock().unwrap();
+                        missing_hashes = hash_vec
                                         .into_iter()
-                                        .filter(|hash| !mempool.exist(hash))
+                                        .filter(|hash| !mempool.exist(&hash))
                                         .collect();
-                    drop(mempool);
+                    }
                     if !missing_hashes.is_empty() {
                         debug!("Reqeest Missing Txs");
                         peer.write(Message::GetTransactions(missing_hashes));
@@ -214,13 +221,15 @@ impl Worker {
                 }
                 Message::GetTransactions(hash_vec) => {
                     debug!("Receive Get Txs");
-                    let mempool = self.mempool.lock().unwrap();       
-                    let tx_vec: Vec<SignedTransaction> = hash_vec
-                                        .into_iter()
-                                        .filter(|hash| mempool.exist(&hash))
-                                        .map(|hash| mempool.get_tx(&hash))
-                                        .collect();
-                    drop(mempool);
+                    let mut tx_vec: Vec<SignedTransaction> = Vec::new();
+                    {
+                        let mempool = self.mempool.lock().unwrap();
+                        tx_vec = hash_vec
+                                .into_iter()
+                                .filter(|hash| mempool.exist(&hash))
+                                .map(|hash| mempool.get_tx(&hash))
+                                .collect();
+                    }
                     if !tx_vec.is_empty(){
                         debug!("Send Txs");
                         peer.write(Message::Transactions(tx_vec));
@@ -228,26 +237,26 @@ impl Worker {
                 }
                 Message::Transactions(tx_vec) => {
                     debug!("Receive Txs");
-                    let mut mempool = self.mempool.lock().unwrap();
                     let mut new_tx_hashes = Vec::<H256>::new();
-                    for signed_tx in tx_vec{
-                        // Check transaction validity
-                        if !verify(&signed_tx.transaction, &signed_tx.public_key, 
-                                   &signed_tx.signature) {
-                            debug!("Invalid Tx");
-                            // println!("Invalid Tx!!!");
-                            continue;
-                        }
+                    {
+                        let mut mempool = self.mempool.lock().unwrap();
+                        for signed_tx in tx_vec{
+                            // Check transaction validity
+                            // if !verify(&signed_tx.transaction, &signed_tx.public_key, 
+                            //         &signed_tx.signature) {
+                            //     debug!("Invalid Tx");
+                            //     // println!("Invalid Tx!!!");
+                            //     continue;
+                            // }
 
-                        // Check if the transaction is already in the mempool
-                        if !mempool.exist(&signed_tx.hash()) {
-                            mempool.insert(&signed_tx);
-                            new_tx_hashes.push(signed_tx.hash());
-                            debug!("Tx {} inserted", signed_tx.hash());
+                            // Check if the transaction is already in the mempool
+                            if !mempool.exist(&signed_tx.hash()) {
+                                mempool.insert(&signed_tx);
+                                new_tx_hashes.push(signed_tx.hash());
+                                debug!("Tx {} inserted", signed_tx.hash());
+                            }
                         }
                     }
-
-                    drop(mempool);
 
                     if !new_tx_hashes.is_empty() {
                         debug!("Broadcasting new tx hashes");

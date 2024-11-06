@@ -3,6 +3,8 @@ use std::time;
 use std::thread;
 
 use ring::signature::{KeyPair, Ed25519KeyPair, Signature};
+use rand::{Rng, thread_rng};
+use ring::rand::SystemRandom;
 
 use crate::types::block::Block;
 use crate::types::hash::Hashable;
@@ -47,34 +49,40 @@ impl TransactionGenerator {
             // implement transaction generation logic here
 
             // In part 7 it's fine to generate a random transaction
-            let receiver = Address::random();
-            let value = rand::random::<u32>();
-            let account_nonce = rand::random::<u32>(); 
-            let _new_tx = Transaction{
-                receiver,
-                value,
-                account_nonce,
-            };
-
-            let key = key_pair::random();
-            let signature = sign(&_new_tx, &key);
-            let _signed_tx = SignedTransaction{
-                transaction: _new_tx,
-                signature: signature.as_ref().to_vec(),
-                public_key: key.public_key().as_ref().to_vec(),
+            let mut rng = thread_rng();
+            let value : u32 = rng.gen::<u32>();
+            let n = 0;
+            let receiver_key: [u8; 32] = rng.gen();
+            
+            let tx = Transaction {
+                receiver: Address::from_public_key_bytes(&receiver_key), 
+                value: value,
+                account_nonce: n,
             };
 
 
-            let mut mempool = self.mempool.lock().unwrap();
-            mempool.insert(&_signed_tx);
-            drop(mempool);
+            // Generate a key pair based on the random seed.
+            let key_pair = key_pair::random();
+            let pub_key = key_pair.public_key().as_ref().to_vec();            
 
-            println!("New transaction generated: {:?}", _signed_tx.hash());
+            let sign_vec: Vec<u8> = sign(&tx, &key_pair).as_ref().to_vec();
 
-            self.server.broadcast(Message::NewTransactionHashes(vec![_signed_tx.hash()])); 
+            let signed_tx = SignedTransaction{
+                transaction : tx,
+                signature : sign_vec,
+                public_key : pub_key,
+            };
+
+            {
+                let mut mempool = self.mempool.lock().unwrap();
+                mempool.insert(&signed_tx);
+            }
+            self.server.broadcast(Message::NewTransactionHashes(vec![signed_tx.hash()])); 
+
+            // println!("New transaction generated: {:?}", signed_tx.hash());
 
             if theta != 0 {
-                let interval = time::Duration::from_micros( theta );
+                let interval = time::Duration::from_millis( 5*theta );
                 thread::sleep(interval);
             }
         }

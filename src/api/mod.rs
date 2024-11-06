@@ -136,15 +136,13 @@ impl Server {
                         }
                         "/blockchain/longest-chain" => {
                             let blockchain = blockchain.lock().unwrap();
-                            let v = blockchain.all_blocks_in_longest_chain();
-                            drop(blockchain);
+                            let v = blockchain.all_blocks_in_longest_chain();   
                             let v_string: Vec<String> = v.into_iter().map(|h|h.to_string()).collect();
                             respond_json!(req, v_string);
                         }
                         "/blockchain/longest-chain-tx" => {
                             // unimplemented!()
                             let txs = blockchain.lock().unwrap().all_tx_in_longest_chain();
-                            drop(blockchain);
                             let mut vv_string = Vec::new();
                             for tx in txs {
                                 let v_string : Vec<String> = tx.iter().map(|h|h.to_string()).collect();

@@ -80,16 +80,27 @@ impl Blockchain {
 
     /// Get all blocks' hashes of the longest chain, ordered from genesis to the tip
     pub fn all_blocks_in_longest_chain(&self) -> Vec<H256> {
-        let mut hashes = Vec::new();
-        let mut current_hash = self.tip;
+        // let mut hashes = Vec::new();
+        // let mut current_hash = self.tip;
 
-        while let Some(hash) = self.blocks.get(&current_hash) {
-            hashes.push(current_hash);
-            current_hash = hash.get_parent();
+        // while let Some(hash) = self.blocks.get(&current_hash) {
+        //     hashes.push(current_hash);
+        //     current_hash = hash.get_parent();
+        // }
+
+        // hashes.reverse(); // Return in order from genesis to tip
+        // hashes
+        let mut new_vec: Vec<H256> = vec!();
+        let mut temp_hash = self.tip();
+        for i in 0..(self.heights[&self.tip]+1){
+            let temp_block = self.blocks.get(&temp_hash).unwrap();
+            let temp_block_copy = temp_block.clone();
+            let block_parent_hash = temp_block_copy.header.parent.clone();
+
+            new_vec.insert(0,temp_hash);
+            temp_hash = block_parent_hash;
         }
-
-        hashes.reverse(); // Return in order from genesis to tip
-        hashes
+        new_vec
     }
 
     /// Get all transactions of the longest chain, ordered from genesis to the tip
@@ -99,8 +110,8 @@ impl Blockchain {
         let mut tx_vec = Vec::new();
         for n in 0..longest_chain.len() {
             let block = self.blocks.get(&longest_chain[n]).unwrap();
-            let txs = block.content.transactions.clone();
-            let txs: Vec<H256> = txs.into_iter().map(|tx| tx.hash()).collect();
+            let txs: Vec<H256> = block.get_transactions()
+                                 .into_iter().map(|tx| tx.hash()).collect();
             tx_vec.push(txs);
         }
         return tx_vec;
