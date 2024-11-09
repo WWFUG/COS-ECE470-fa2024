@@ -88,7 +88,6 @@ impl State {
         self.account_states.insert(sender, sender_state);
         self.account_states.insert(receiver, receiver_state);
     }
-
 }
 
 
