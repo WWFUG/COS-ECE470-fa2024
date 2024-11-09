@@ -38,10 +38,9 @@ fn main() {
     // init logger
     let verbosity = matches.occurrences_of("verbose") as usize;
     stderrlog::new().verbosity(verbosity).init().unwrap();
-    let blockchain = Blockchain::new();
-    let blockchain = Arc::new(Mutex::new(blockchain));
-    let mempool = Mempool::new();
-    let mempool = Arc::new(Mutex::new(mempool));
+
+    let blockchain = Arc::new(Mutex::new(Blockchain::new()));
+    let mempool = Arc::new(Mutex::new(Mempool::new()));
 
     // parse p2p server address
     let p2p_addr = matches
