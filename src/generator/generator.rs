@@ -10,6 +10,7 @@ use crate::types::block::Block;
 use crate::types::hash::Hashable;
 use crate::blockchain::Blockchain;
 use crate::types::mempool::Mempool;
+use crate::types::state::{State, StatePerBlock};
 use crate::network::server::Handle as ServerHandle;
 use std::sync::{Arc, Mutex};
 use crate::types::address::Address;
@@ -21,16 +22,19 @@ use crate::network::message::Message;
 pub struct TransactionGenerator {
     server: ServerHandle,
     mempool: Arc<Mutex<Mempool>>,
+    state_per_block: Arc<Mutex<StatePerBlock>>,
 }
 
 impl TransactionGenerator {
     pub fn new(
         server: &ServerHandle,
         mempool: &Arc<Mutex<Mempool>>,
+        state_per_block: &Arc<Mutex<StatePerBlock>>,
     ) -> Self {
         Self { 
             server: server.clone(), 
             mempool: Arc::clone(mempool),
+            state_per_block: Arc::clone(state_per_block),
         }
     }
 

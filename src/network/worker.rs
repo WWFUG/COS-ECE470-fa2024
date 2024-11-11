@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use crate::types::hash::H256;
 use crate::types::hash::Hashable; 
 use crate::blockchain::Blockchain;
+use crate::types::state::{State, StatePerBlock};
 use crate::types::mempool::Mempool;
 use crate::types::block::{Block};
 use crate::types::transaction::{SignedTransaction, Transaction, verify};
@@ -28,6 +29,7 @@ pub struct Worker {
     server: ServerHandle,
     blockchain: Arc<Mutex<Blockchain>>, 
     mempool: Arc<Mutex<Mempool>>,
+    state_per_block: Arc<Mutex<StatePerBlock>>,
 }
 
 #[derive(Clone)]
@@ -58,6 +60,7 @@ impl Worker {
         server: &ServerHandle,
         blockchain: &Arc<Mutex<Blockchain>>,
         mempool: &Arc<Mutex<Mempool>>,
+        state_per_block: &Arc<Mutex<StatePerBlock>>,
     ) -> Self {
         Self {
             msg_chan: msg_src,
@@ -65,6 +68,7 @@ impl Worker {
             server: server.clone(),
             blockchain: Arc::clone(blockchain),
             mempool: Arc::clone(mempool),
+            state_per_block: Arc::clone(state_per_block),
         }
     }
 

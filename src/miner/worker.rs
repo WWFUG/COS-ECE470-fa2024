@@ -3,6 +3,7 @@ use log::{debug, info};
 use crate::network::message::Message::{NewBlockHashes, self};
 use crate::types::block::Block;
 use crate::types::mempool::Mempool;
+use crate::types::state::{StatePerBlock, State};
 use crate::network::server::Handle as ServerHandle;
 use crate::blockchain::{Blockchain};
 use crate::types::hash::Hashable;
@@ -14,6 +15,7 @@ pub struct Worker {
     server: ServerHandle,
     finished_block_chan: Receiver<Block>,
     blockchain: Arc<Mutex<Blockchain>>,
+    state_per_block: Arc<Mutex<StatePerBlock>>,
 }
 
 impl Worker {
@@ -21,11 +23,13 @@ impl Worker {
         server: &ServerHandle,
         finished_block_chan: Receiver<Block>,
         blockchain: &Arc<Mutex<Blockchain>>,
+        state_per_block: &Arc<Mutex<StatePerBlock>>,
     ) -> Self {
         Self {
             server: server.clone(),
             finished_block_chan,
             blockchain: Arc::clone(blockchain),
+            state_per_block: Arc::clone(state_per_block),
         }
     }
 

@@ -88,6 +88,17 @@ impl State {
         self.account_states.insert(sender, sender_state);
         self.account_states.insert(receiver, receiver_state);
     }
+
+    pub fn to_vec_string(&self) -> Vec<String> {
+        let mut s = Vec::new();
+        for (address, state) in &self.account_states {
+            let nonce = state.nonce;
+            let balance = state.balance;
+            s.push(format!("({}, {}, {})", address, nonce, balance));
+        }
+        s.sort();
+        s
+    }
 }
 
 
@@ -98,10 +109,10 @@ pub struct StatePerBlock{
 }
 
 impl StatePerBlock {
-    pub fn new(genesis_hash: H256) -> Self {
+    pub fn new(genesis_hash: &H256) -> Self {
         let state = State::new(); // three initial accounts initialized
         let mut s_copy = HashMap::new();
-        s_copy.insert(genesis_hash, state);
+        s_copy.insert(genesis_hash.clone(), state);
         Self {
             state_copy: s_copy,
         }

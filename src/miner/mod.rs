@@ -10,6 +10,7 @@ use std::thread;
 use crate::types::block::{Header, Block, Content};
 use std::sync::{Arc, Mutex};
 use crate::blockchain::Blockchain;
+use crate::types::state::{State, StatePerBlock};
 use crate::types::hash::{H256, Hashable};
 use crate::types::mempool::Mempool;
 use crate::types::merkle::MerkleTree;
@@ -35,6 +36,7 @@ pub struct Context {
     finished_block_chan: Sender<Block>,
     blockchain: Arc<Mutex<Blockchain>>,
     mempool: Arc<Mutex<Mempool>>,
+    state_per_block: Arc<Mutex<StatePerBlock>>,
 }
 
 #[derive(Clone)]
@@ -43,12 +45,14 @@ pub struct Handle {
     control_chan: Sender<ControlSignal>,
 }
 
-pub fn new(blockchain: &Arc<Mutex<Blockchain>>, mempool: &Arc<Mutex<Mempool>>) -> 
+pub fn new(blockchain: &Arc<Mutex<Blockchain>>, mempool: &Arc<Mutex<Mempool>>, 
+           state_per_block: &Arc<Mutex<StatePerBlock>>) -> 
 (Context, Handle, Receiver<Block>) {
     let (signal_chan_sender, signal_chan_receiver) = unbounded();
     let (finished_block_sender, finished_block_receiver) = unbounded();
     let blockchain_cloned = Arc::clone(blockchain);
     let mempool_cloned = Arc::clone(mempool);
+    let state_per_block_cloned = Arc::clone(state_per_block);
 
     let ctx = Context {
         control_chan: signal_chan_receiver,
@@ -56,6 +60,7 @@ pub fn new(blockchain: &Arc<Mutex<Blockchain>>, mempool: &Arc<Mutex<Mempool>>) -
         finished_block_chan: finished_block_sender,
         blockchain: blockchain_cloned,
         mempool: mempool_cloned,
+        state_per_block: state_per_block_cloned,
     };
 
     let handle = Handle {
@@ -71,7 +76,8 @@ fn test_new() -> (Context, Handle, Receiver<Block>) {
     let blockchain = Arc::new(Mutex::new(blockchain));
     let mempool = Mempool::new();
     let mempool = Arc::new(Mutex::new(mempool));
-    new(&blockchain, &mempool)
+    let state_per_block = StatePerBlock::new(H256::default());
+    new(&blockchain, &mempool, &state_per_block)
 }
 
 impl Handle {

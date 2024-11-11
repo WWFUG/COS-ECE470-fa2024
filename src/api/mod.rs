@@ -1,6 +1,8 @@
 use serde::Serialize;
 use crate::blockchain::Blockchain;
 use crate::generator::generator::TransactionGenerator;
+use crate::types::state::{State, StatePerBlock};
+use crate::types::hash::H256;
 use crate::miner::Handle as MinerHandle;
 use crate::network::server::Handle as NetworkServerHandle;
 use crate::network::message::Message;
@@ -20,6 +22,7 @@ pub struct Server {
     network: NetworkServerHandle,
     blockchain: Arc<Mutex<Blockchain>>,
     tx_generator: TransactionGenerator,
+    state_per_block: Arc<Mutex<StatePerBlock>>,
 }
 
 #[derive(Serialize)]
@@ -56,6 +59,7 @@ impl Server {
         network: &NetworkServerHandle,
         blockchain: &Arc<Mutex<Blockchain>>,
         tx_generator: &TransactionGenerator,
+        state_per_block: &Arc<Mutex<StatePerBlock>>,
     ) {
         let handle = HTTPServer::http(&addr).unwrap();
         let server = Self {
@@ -64,6 +68,7 @@ impl Server {
             network: network.clone(),
             blockchain: Arc::clone(blockchain),
             tx_generator: tx_generator.clone(),
+            state_per_block: Arc::clone(state_per_block),
         };
         thread::spawn(move || {
             for req in server.handle.incoming_requests() {
@@ -71,6 +76,7 @@ impl Server {
                 let network = server.network.clone();
                 let blockchain = Arc::clone(&server.blockchain);
                 let tx_generator = server.tx_generator.clone();
+                let state_per_block = Arc::clone(&server.state_per_block);
                 thread::spawn(move || {
                     // a valid url requires a base
                     let base_url = Url::parse(&format!("http://{}/", &addr)).unwrap();
@@ -149,6 +155,45 @@ impl Server {
                                 vv_string.push(v_string);
                             }
                             respond_json!(req, vv_string);
+                        }
+                        "/blockchain/state" => {
+                            let params = url.query_pairs();
+                            let params: HashMap<_, _> = params.into_owned().collect();
+                            let block_id = match params.get("block") {
+                                Some(v) => v,
+                                None => {
+                                    respond_result!(req, false, "missing block");
+                                    return;
+                                }
+                            };
+                            let block_id : usize = match block_id.parse::<usize>() {
+                                Ok(v) => v,
+                                Err(e) => {
+                                    respond_result!(
+                                        req,
+                                        false,
+                                        format!("error parsing block: {}", e)
+                                    );
+                                    return;
+                                }
+                            };
+                            let mut longest_chain = Vec::new();
+                            let mut block_hash = H256::default();
+                            let mut block_state = State::new();
+                            {
+                                let blockchain = blockchain.lock().unwrap();
+                                longest_chain = blockchain.all_blocks_in_longest_chain();
+                                assert!(longest_chain.len() > block_id);
+                                block_hash = longest_chain[block_id];
+                            }
+
+                            let mut v_string = Vec::new();
+                            {
+                                let state_per_block = state_per_block.lock().unwrap();
+                                block_state = state_per_block.get_state(&block_hash);
+                                v_string = block_state.to_vec_string();
+                            }
+                            respond_json!(req, v_string);
                         }
                         "/blockchain/longest-chain-tx-count" => {
                             // unimplemented!()
