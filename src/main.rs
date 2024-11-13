@@ -13,6 +13,8 @@ use blockchain::Blockchain;
 use types::mempool::Mempool;
 use generator::generator::TransactionGenerator;
 use types::state::{StatePerBlock};
+use crate::types::key_pair;
+use ring::signature::{KeyPair, Ed25519KeyPair, Signature};
 use clap::clap_app;
 use smol::channel;
 use log::{error, info};
@@ -56,6 +58,24 @@ fn main() {
             process::exit(1);
         });
 
+    let node1_addr: net::SocketAddr = "127.0.0.1:6000".parse().expect("Invalid address");
+    let node2_addr: net::SocketAddr = "127.0.0.1:6001".parse().expect("Invalid address");
+    let node3_addr: net::SocketAddr = "127.0.0.1:6002".parse().expect("Invalid address");
+
+    let mut key_pair = key_pair::random();
+    if p2p_addr == node1_addr {
+        key_pair = Ed25519KeyPair::from_seed_unchecked(&[0; 32]).unwrap();
+    } else if p2p_addr == node2_addr {
+        key_pair = Ed25519KeyPair::from_seed_unchecked(&[1; 32]).unwrap();
+    } else if p2p_addr == node3_addr {
+        key_pair = Ed25519KeyPair::from_seed_unchecked(&[2; 32]).unwrap();
+    }
+    else {
+        unimplemented!();
+    }
+
+    
+
     // parse api server address
     let api_addr = matches
         .value_of("api_addr")
@@ -98,7 +118,7 @@ fn main() {
     miner_ctx.start();
     miner_worker_ctx.start();
 
-    let tx_generator = TransactionGenerator::new(&server, &mempool, &state_per_block);
+    let tx_generator = TransactionGenerator::new(&server, &mempool, &state_per_block, &blockchain, Arc::new(key_pair));
 
     // connect to known peers
     if let Some(known_peers) = matches.values_of("known_peer") {

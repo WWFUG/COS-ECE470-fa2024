@@ -164,18 +164,6 @@ impl Worker {
                                 continue;
                             }
 
-                            // Transaction validity check
-                            // let mut tx_valid = true;
-                            // for tx in blk.content.transactions.iter() {
-                            //     if !verify(&tx.transaction, &tx.public_key, &tx.signature) {
-                            //         tx_valid = false;
-                            //         break;
-                            //     }
-                            // }
-                            // if !tx_valid {
-                            //     continue;
-                            // }
-
                             // Insert the block into the blockchain
                             if !blockchain.exist(&blk.hash()) {
 
@@ -246,12 +234,12 @@ impl Worker {
                         let mut mempool = self.mempool.lock().unwrap();
                         for signed_tx in tx_vec{
                             // Check transaction validity
-                            // if !verify(&signed_tx.transaction, &signed_tx.public_key, 
-                            //         &signed_tx.signature) {
-                            //     debug!("Invalid Tx");
-                            //     // println!("Invalid Tx!!!");
-                            //     continue;
-                            // }
+                            if !verify(&signed_tx.transaction, &signed_tx.public_key, 
+                                    &signed_tx.signature) {
+                                debug!("Invalid Tx");
+                                // println!("Invalid Tx!!!");
+                                continue;
+                            }
 
                             // Check if the transaction is already in the mempool
                             if !mempool.exist(&signed_tx.hash()) {

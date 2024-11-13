@@ -49,14 +49,17 @@ impl Worker {
                 .finished_block_chan
                 .recv()
                 .expect("Receive finished block error");
-
             {
                 let mut blockchain = self.blockchain.lock().unwrap();
                 blockchain.insert(&_block);
                 debug!("Block {} succesfully mined; Broadcasting ...", _block.hash());
-                self.server
-                    .broadcast(Message::NewBlockHashes(vec![_block.hash()])); // blocking operation
             }
+            {
+                // update state per block
+            }
+
+            self.server
+                    .broadcast(Message::NewBlockHashes(vec![_block.hash()])); // blocking operation
         }
     }
 

@@ -28,11 +28,12 @@ impl State {
 
         let seed = vec![0, 1, 2];
 
+        // ICO
         for i in 0..3 {
             let key_pair = Ed25519KeyPair::from_seed_unchecked(&[seed[i];32]).unwrap();
             let pub_key = key_pair.public_key();
             let address = Address::from_public_key_bytes(pub_key.as_ref());
-            let balance = 10000;
+            let balance = u32::MAX / 3;
             let account_state = AccountState {
                 nonce: 0,
                 balance: balance,
