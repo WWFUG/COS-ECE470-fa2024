@@ -50,12 +50,15 @@ impl Worker {
                 .recv()
                 .expect("Receive finished block error");
             {
+                // insert block
                 let mut blockchain = self.blockchain.lock().unwrap();
                 blockchain.insert(&_block);
                 debug!("Block {} succesfully mined; Broadcasting ...", _block.hash());
             }
             {
-                // update state per block
+                // update state per block (execute transactions)
+                let mut state_per_block = self.state_per_block.lock().unwrap();
+                state_per_block.update_with_block(&_block);
             }
 
             self.server

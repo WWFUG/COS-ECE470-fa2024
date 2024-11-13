@@ -1,6 +1,6 @@
 pub mod worker;
 
-use log::info;
+use log::{info, debug};
 
 use crossbeam::channel::{unbounded, Receiver, Sender, TryRecvError};
 use std::time;
@@ -10,11 +10,15 @@ use std::thread;
 use crate::types::block::{Header, Block, Content};
 use std::sync::{Arc, Mutex};
 use crate::blockchain::Blockchain;
-use crate::types::state::{State, StatePerBlock};
+use crate::types::state::{State, StatePerBlock, AccountState};
 use crate::types::hash::{H256, Hashable};
 use crate::types::mempool::Mempool;
 use crate::types::merkle::MerkleTree;
 use std::time::{SystemTime, UNIX_EPOCH};
+use crate::types::transaction::{SignedTransaction, Transaction, verify};
+use crate::types::key_pair;
+use crate::types::address::Address;
+use std::collections::HashMap;
 
 
 enum ControlSignal {
@@ -115,6 +119,7 @@ impl Context {
         // main mining loop
         loop {
             // check and react to control signals
+            // println!("Mine a block ...\n");
             match self.operating_state {
                 OperatingState::Paused => {
                     let signal = self.control_chan.recv().unwrap();
@@ -160,26 +165,67 @@ impl Context {
                 return;
             }
 
-            // TODO handling transaction using mempool
+            {
+                let blockchain = self.blockchain.lock().unwrap();
+                parent_hash = blockchain.tip();
+                parent_difficulty = blockchain.get_block(&parent_hash).get_difficulty();
+            }
+
+            let mut cur_state;
+            {
+                let state_per_block = self.state_per_block.lock().unwrap();
+                assert!(state_per_block.exist(&parent_hash));
+                cur_state = state_per_block.get_state(&parent_hash); // use cur_state to simulate transactions
+            }
+
             // insert the transactions into content
 
             let tx_limit = 50; // NOTE: this is a temporary value, you can change it
 
             let mut block_txs = Vec::new();
             {
-                let mempool = self.mempool.lock().unwrap();
+                let mut mempool = self.mempool.lock().unwrap();
                 for tx in mempool.all_transactions() {
+                    // tx check
+                    // 1. verify the signature
+                    if !verify(&tx.transaction, &tx.public_key, &tx.signature) {
+                        mempool.remove(&tx);
+                        println!("Invalid tx signature\n");
+                        continue;
+                    }
+                    
+                    let sender = Address::from_public_key_bytes(&tx.public_key);
+                    let receiver = tx.transaction.receiver.clone();
+                    let value = tx.transaction.value;
+                    let nonce = tx.transaction.account_nonce;
+                    assert!(cur_state.exist(&sender));
+
+                    // 2. check the balance and nonce
+                    if (cur_state.get_balance(&sender) < value) || (cur_state.get_nonce(&sender)+1 != nonce) {
+                        mempool.remove(&tx);
+                        // println!("Invalid tx balance or nonce\n");
+                        continue;
+                    }
+
                     block_txs.push(tx.clone());
+                    cur_state.insert(sender, AccountState{nonce: nonce+1, 
+                                                          balance: cur_state.get_balance(&sender) - value,
+                                                         } );
+
+                    if cur_state.exist(&receiver) {
+                        cur_state.insert(receiver, AccountState{
+                                                                nonce: cur_state.get_nonce(&receiver),
+                                                                balance: cur_state.get_balance(&receiver) + value,} );
+                    } else {
+                        cur_state.insert(receiver, AccountState{nonce: 0, 
+                                                                balance: value});
+                    }
+
+                    // println!("Valid tx\n");
                     if block_txs.len() == tx_limit {
                         break;
                     }
                 }
-            }
-
-            {
-                let blockchain = self.blockchain.lock().unwrap();
-                parent_hash = blockchain.tip();
-                parent_difficulty = blockchain.get_block(&parent_hash).get_difficulty();
             }
             
             let difficulty = parent_difficulty;
@@ -197,7 +243,6 @@ impl Context {
 
             
             let block = Block {header, content};
-
             if block.hash() <= difficulty && !block.get_transactions().is_empty() {
 
                 println!("Block tx size: {}", block.content.transactions.len());
@@ -210,10 +255,15 @@ impl Context {
                     }
                 }
 
-                {
-                    let mut blockchain = self.blockchain.lock().unwrap();
-                    blockchain.insert(&block);
-                }
+                // {
+                //     let mut blockchain = self.blockchain.lock().unwrap();
+                //     blockchain.insert(&block);
+                // }
+
+                // {
+                //     let mut state_per_block = self.state_per_block.lock().unwrap();
+                //     state_per_block.update_with_block(&block);
+                // }
                 
                 self.finished_block_chan.send(block.clone()).expect("Send finished block error");
             }

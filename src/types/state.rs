@@ -77,7 +77,7 @@ impl State {
     
         assert!( self.exist(&sender) && self.exist(&receiver) );
         assert!( self.get_balance(&sender) >= value );
-
+        assert!( self.get_nonce(&sender)+1 == nonce );
 
         let mut sender_state = self.account_states.get(&sender).unwrap().clone();
         let mut receiver_state = self.account_states.get(&receiver).unwrap().clone();
@@ -88,6 +88,18 @@ impl State {
         // reinsert the updated states since rust does not support mutable reference to a value in a hashmap
         self.account_states.insert(sender, sender_state);
         self.account_states.insert(receiver, receiver_state);
+    }
+
+    pub fn get_accounts(&self) -> Vec<Address> {
+        let mut accounts = Vec::new();
+        for (address, _) in &self.account_states {
+            accounts.push(address.clone());
+        }
+        accounts
+    }
+
+    pub fn insert(&mut self, address: Address, state: AccountState) {
+        self.account_states.insert(address, state);
     }
 
     pub fn to_vec_string(&self) -> Vec<String> {
@@ -129,7 +141,7 @@ impl StatePerBlock {
 
     // make sure that the block contains valid transactions
     pub fn update_with_block(&mut self, block: &Block) {
-        assert!(!self.exist(&block.hash()));
+        // assert!(!self.exist(&block.hash()));
 
         let parent_hash = block.header.parent.clone();
         assert!(self.exist(&parent_hash));
@@ -139,9 +151,19 @@ impl StatePerBlock {
 
         for tx in block.get_transactions() {
             let signed_tx = tx.clone();
+
+            let sender = Address::from_public_key_bytes(&signed_tx.public_key);
+            let receiver = signed_tx.transaction.receiver.clone();
+            assert!(state.exist(&sender));
+            if !state.exist(&receiver) {
+                state.add_account(receiver.clone(), 0);
+            }
+            assert!(state.get_nonce(&sender)+1 == signed_tx.transaction.account_nonce);
+
             state.update_with_tx(&signed_tx);
         }
 
         self.state_copy.insert(block.hash(), state);
+        // println!("State updated with block {}", block.hash());
     }
 }

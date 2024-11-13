@@ -1,4 +1,4 @@
-use log::info;
+use log::{info, debug};
 use std::time;
 use std::thread;
 use std::sync::{Arc, Mutex};
@@ -68,6 +68,7 @@ impl TransactionGenerator {
             let mut cur_state;
             {
                 let state_per_block = self.state_per_block.lock().unwrap();
+                assert!(state_per_block.exist(&tip_hash));
                 cur_state = state_per_block.get_state(&tip_hash);
             }
     
@@ -79,6 +80,9 @@ impl TransactionGenerator {
                 sender_index = rng.gen_range(0..self.vec_key_pairs.len());
                 sender_pub_key = self.vec_key_pairs[sender_index].public_key().clone();  // Clone here to avoid later immutable borrow
                 sender_account = Address::from_public_key_bytes(sender_pub_key.as_ref());
+                if !cur_state.exist(&sender_account) {
+                    continue;
+                }
                 if cur_state.get_balance(&sender_account) > 0 {
                     break;
                 }
@@ -88,15 +92,14 @@ impl TransactionGenerator {
             let value: u32 = rng.gen_range(1..cur_state.get_balance(&sender_account));
             let n = cur_state.get_nonce(&sender_account) + 1;
     
-            // Generate or pick a receiver
+            // Generate a new receiver account with 10% probability
+            // or randomly select an existing account
             let receiver_account = if rng.gen_range(1..10) >= 9 {
                 let receiver_key_pair = Arc::new(key_pair::random());
                 self.vec_key_pairs.push(Arc::clone(&receiver_key_pair));  // Mutably borrow here
                 Address::from_public_key_bytes(receiver_key_pair.public_key().as_ref())
             } else {
-                let accounts: Vec<_> = self.vec_key_pairs.iter().map(|kp| {
-                    Address::from_public_key_bytes(kp.public_key().as_ref())
-                }).collect();
+                let accounts: Vec<Address> = cur_state.get_accounts();
     
                 let mut receiver_account;
                 loop {
@@ -126,8 +129,8 @@ impl TransactionGenerator {
             {
                 let mut mempool = self.mempool.lock().unwrap();
                 mempool.insert(&signed_tx);
+                self.server.broadcast(Message::NewTransactionHashes(vec![signed_tx.hash()]));
             }
-            self.server.broadcast(Message::NewTransactionHashes(vec![signed_tx.hash()]));
     
             // Control generation frequency
             if theta != 0 {

@@ -10,6 +10,7 @@ use crate::types::mempool::Mempool;
 use crate::types::block::{Block};
 use crate::types::transaction::{SignedTransaction, Transaction, verify};
 use crate::types::key_pair;
+use crate::types::address::Address;
 
 use std::collections::VecDeque;
 use std::collections::HashMap;
@@ -138,6 +139,8 @@ impl Worker {
                     let mut new_blk_hashes = Vec::<H256>::new();
                     let mut block_queue: VecDeque<Block> = VecDeque::from(block_vec); // Convert vector to VecDeque
 
+                    let mut cur_state: State;;
+
                     {
                         let mut blockchain = self.blockchain.lock().unwrap();
                         // Process the blocks in the queue
@@ -164,10 +167,33 @@ impl Worker {
                                 continue;
                             }
 
+                            // Check if the transactions in the block are invalid
+                            let mut invalid_tx = false;
+                            for tx in &blk.content.transactions {
+                                if !verify(&tx.transaction, &tx.public_key, &tx.signature) {
+                                    invalid_tx = true;
+                                    break;
+                                }
+                                let sender_account = Address::from_public_key_bytes(&tx.public_key);
+                                let value = tx.transaction.value;
+                                let nonce = tx.transaction.account_nonce;
+                                let cur_state = self.state_per_block.lock().unwrap().get_state(&blk.get_parent());
+                                if (cur_state.get_balance(&sender_account) < value) || 
+                                   (cur_state.get_nonce(&sender_account)+1 != nonce) {
+                                    invalid_tx = true;
+                                    break;
+                                }
+                            }
+
+                            if invalid_tx {
+                                continue;
+                            }
+
                             // Insert the block into the blockchain
                             if !blockchain.exist(&blk.hash()) {
 
                                 blockchain.insert(&blk);
+                                self.state_per_block.lock().unwrap().update_with_block(&blk);
 
                                 // remove transactions in this block from mempool
                                 // update mempool

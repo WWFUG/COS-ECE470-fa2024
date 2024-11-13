@@ -19,7 +19,7 @@ impl Blockchain {
     pub fn new() -> Self {
         // Create the genesis block with fixed values
         // println!("New Blockchain");
-        let difficulty = hex!("0000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").into(); // set difficulty
+        let difficulty = hex!("000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").into(); // set difficulty
         let genesis_block = Block {
             header: Header {
                 parent: H256::from([0x00; 32]), // Genesis block has no parent
